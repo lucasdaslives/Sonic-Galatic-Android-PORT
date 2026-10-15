@@ -1,9 +1,0 @@
-Sonic Galactic - APK nativo (Hatch Engine + SDL2)
-
-1. Crie um repositorio no GitHub e envie TODOS os arquivos desta pasta.
-   (NAO envie o Data.hatch - ele e grande demais para o GitHub.)
-2. Aba "Actions" > "Build APK" > "Run workflow".
-3. Quando terminar (uns 10-20 min), abra a execucao e baixe o artefato
-   "SonicGalactic-APK" (um .zip com o .apk dentro).
-4. Instale o APK no celular. Na primeira abertura, escolha o Data.hatch
-   (ele e copiado pra dentro do app, so uma vez).
