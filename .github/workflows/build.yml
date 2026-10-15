@@ -26,13 +26,25 @@ jobs:
           git remote add origin https://github.com/HatchGameEngine/HatchGameEngine.git
           git fetch -q --depth 1 origin 8a46d180f9f5f9107c172f6557a557c67578ed74
           git checkout -q FETCH_HEAD
-          # renderer de software (igual ao site): transicoes/tint corretos
           python3 - <<'PY'
           p = 'source/Engine/Application.cpp'
           t = open(p, encoding='utf-8', errors='replace', newline='').read()
           alvo = 'ParseGameConfigBool(node, "useSoftwareRenderer", Graphics::UseSoftwareRenderer);'
           assert alvo in t, 'linha do useSoftwareRenderer nao encontrada'
           t = t.replace(alvo, alvo + '\n\t\tGraphics::UseSoftwareRenderer = true;', 1)
+          open(p, 'w', encoding='utf-8', newline='').write(t)
+
+          # detecta quando o script usa o touch (botoes do jogo ativos) para o botao S acompanhar
+          p = 'source/Engine/Bytecode/StandardLibrary.cpp'
+          t = open(p, encoding='utf-8', errors='replace', newline='').read()
+          i = t.index('VMValue Touch_GetX(')
+          j = t.index('// #endregion', i)
+          bloco = t[i:j]
+          a = 'int touch_index = GET_ARG(0, GetInteger);'
+          assert bloco.count(a) == 5, bloco.count(a)
+          bloco = bloco.replace(a, a + ' TouchLastPoll = SDL_GetTicks();')
+          jni = '#ifdef ANDROID\n#include <jni.h>\n#endif\nUint32 TouchLastPoll = 0;\n#ifdef ANDROID\nextern "C" JNIEXPORT jboolean JNICALL Java_com_sonicgalactic_app_TouchOverlay_nativeTouchActive(JNIEnv* env, jclass cls) {\n\treturn (SDL_GetTicks() - TouchLastPoll) < 400 ? JNI_TRUE : JNI_FALSE;\n}\n#endif\n'
+          t = t[:i] + jni + bloco + t[j:]
           open(p, 'w', encoding='utf-8', newline='').write(t)
           PY
 
