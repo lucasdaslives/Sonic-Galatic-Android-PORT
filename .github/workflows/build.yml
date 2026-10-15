@@ -1,1 +1,58 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extrair projeto
+        run: unzip -q projeto.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Baixar Hatch Engine (versao de marco/2025)
+        run: |
+          mkdir engine && cd engine
+          git init -q
+          git remote add origin https://github.com/HatchGameEngine/HatchGameEngine.git
+          git fetch -q --depth 1 origin 8a46d180f9f5f9107c172f6557a557c67578ed74
+          git checkout -q FETCH_HEAD
+          # renderer de software (igual ao site): transicoes/tint corretos
+          python3 - <<'PY'
+          p = 'source/Engine/Application.cpp'
+          t = open(p, encoding='utf-8', errors='replace', newline='').read()
+          alvo = 'ParseGameConfigBool(node, "useSoftwareRenderer", Graphics::UseSoftwareRenderer);'
+          assert alvo in t, 'linha do useSoftwareRenderer nao encontrada'
+          t = t.replace(alvo, alvo + '\n\t\tGraphics::UseSoftwareRenderer = true;', 1)
+          open(p, 'w', encoding='utf-8', newline='').write(t)
+          PY
+
+      - name: Baixar SDL2
+        run: |
+          curl -sL https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz | tar xz
+          mv SDL2-2.30.9 app/src/main/cpp/SDL
+          cp -r app/src/main/cpp/SDL/android-project/app/src/main/java/org app/src/main/java/
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Compilar APK
+        env:
+          ENGINE_DIR: ${{ github.workspace }}/engine
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SonicGalactic-APK
+          path: app/build/outputs/apk/release/*.apk
 
