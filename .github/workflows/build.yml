@@ -42,9 +42,13 @@ jobs:
           mv SDL2-2.30.9 app/src/main/cpp/SDL
           cp -r app/src/main/cpp/SDL/android-project/app/src/main/java/org app/src/main/java/
 
+      - name: Remover gradle-wrapper.jar de terceiros
+        run: find . -name gradle-wrapper.jar -delete
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+          validate-wrappers: false
 
       - name: Compilar APK
         env:
@@ -55,4 +59,3 @@ jobs:
         with:
           name: SonicGalactic-APK
           path: app/build/outputs/apk/release/*.apk
-
