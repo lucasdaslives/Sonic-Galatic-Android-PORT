@@ -36,6 +36,9 @@ jobs:
           open(p, 'w', encoding='utf-8', newline='').write(t)
           PY
 
+      - name: Corrigir hint do SDL (removido no SDL 2.30)
+        run: sed -i 's/SDL_HINT_ANDROID_SEPARATE_MOUSE_AND_TOUCH/"SDL_ANDROID_SEPARATE_MOUSE_AND_TOUCH"/' engine/source/Engine/Application.cpp
+
       - name: Baixar SDL2
         run: |
           curl -sL https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz | tar xz
