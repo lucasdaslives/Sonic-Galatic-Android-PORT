@@ -18,8 +18,10 @@ jobs:
 
       - name: Install NDK + CMake
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "ndk;24.0.8215888" "cmake;3.22.1" "platforms;android-33" "build-tools;33.0.2"
+          SDKM=$(find "$ANDROID_HOME" /usr/local/lib/android -name sdkmanager -type f 2>/dev/null | head -1)
+          echo "sdkmanager em: $SDKM"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" "ndk;24.0.8215888" "cmake;3.22.1" "platforms;android-33" "build-tools;33.0.2"
 
       - name: Get RSDKv5 engine
         run: |
@@ -47,4 +49,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Sonic2M
+          name: Sonic2Mania-APK
+          path: rsdk/android/app/build/outputs/apk/release/*.apk
