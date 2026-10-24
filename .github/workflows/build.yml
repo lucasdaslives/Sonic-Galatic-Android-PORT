@@ -1,77 +1,50 @@
 name: Build APK
-
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extrair projeto
-        run: unzip -q projeto.zip
+      - name: Unzip project
+        run: unzip -q projeto-s2m-android.zip -d proj
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
-      - name: Baixar Hatch Engine (versao de marco/2025)
+      - name: Install NDK + CMake
         run: |
-          mkdir engine && cd engine
-          git init -q
-          git remote add origin https://github.com/HatchGameEngine/HatchGameEngine.git
-          git fetch -q --depth 1 origin 8a46d180f9f5f9107c172f6557a557c67578ed74
-          git checkout -q FETCH_HEAD
-          python3 - <<'PY'
-          p = 'source/Engine/Application.cpp'
-          t = open(p, encoding='utf-8', errors='replace', newline='').read()
-          alvo = 'ParseGameConfigBool(node, "useSoftwareRenderer", Graphics::UseSoftwareRenderer);'
-          assert alvo in t, 'linha do useSoftwareRenderer nao encontrada'
-          t = t.replace(alvo, alvo + '\n\t\tGraphics::UseSoftwareRenderer = true;', 1)
-          open(p, 'w', encoding='utf-8', newline='').write(t)
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "ndk;24.0.8215888" "cmake;3.22.1" "platforms;android-33" "build-tools;33.0.2"
 
-          # special/bonus stages (3D): usa o renderer normal (hardware); o resto continua em software
-          p = 'source/Engine/Bytecode/StandardLibrary.cpp'
-          t = open(p, encoding='utf-8', errors='replace', newline='').read()
-          a = 'Scene::Views[view_index].Software = !!usedswrend;'
-          assert a in t, 'View_SetUseSoftwareRenderer nao encontrado'
-          t = t.replace(a, 'Scene::Views[view_index].Software = !!usedswrend && !(strstr(Scene::CurrentScene, "BonusStage") || strstr(Scene::CurrentScene, "Special Stages"));', 1)
-          open(p, 'w', encoding='utf-8', newline='').write(t)
-          p = 'source/Engine/Scene.cpp'
-          t = open(p, encoding='utf-8', errors='replace', newline='').read()
-          a = 'memmove(Scene::CurrentScene, filename, strlen(filename) + 1);'
-          assert a in t, 'CurrentScene nao encontrado'
-          t = t.replace(a, a + '\n\t{\n\t\tbool is3DStage = strstr(Scene::CurrentScene, "BonusStage") || strstr(Scene::CurrentScene, "Special Stages");\n\t\tfor (int vi = 0; vi < MAX_SCENE_VIEWS; vi++) {\n\t\t\tScene::Views[vi].Software = Graphics::UseSoftwareRenderer && !is3DStage;\n\t\t}\n\t}', 1)
-          open(p, 'w', encoding='utf-8', newline='').write(t)
-          PY
-
-      - name: Corrigir hint do SDL (removido no SDL 2.30)
-        run: sed -i 's/SDL_HINT_ANDROID_SEPARATE_MOUSE_AND_TOUCH/"SDL_ANDROID_SEPARATE_MOUSE_AND_TOUCH"/' engine/source/Engine/Application.cpp
-
-      - name: Baixar SDL2
+      - name: Get RSDKv5 engine
         run: |
-          curl -sL https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz | tar xz
-          mv SDL2-2.30.9 app/src/main/cpp/SDL
-          cp -r app/src/main/cpp/SDL/android-project/app/src/main/java/org app/src/main/java/
+          git clone --recursive https://github.com/RSDKModding/RSDKv5-Decompilation rsdk
+          cd rsdk && git checkout 191d7aea6c262d891244172a8609ac69fbfd7571 && git submodule update --init --recursive
 
-      - name: Remover gradle-wrapper.jar de terceiros
-        run: find . -name gradle-wrapper.jar -delete
+      - name: Get libogg + libtheora
+        run: |
+          cd rsdk/dependencies/android
+          mkdir -p libogg libtheora
+          curl -sL https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.gz | tar xz -C libogg --strip-components=1
+          curl -sL https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.gz | tar xz -C libtheora --strip-components=1
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-          validate-wrappers: false
+      - name: Link game logic
+        run: |
+          cd rsdk/android/app/jni
+          ln -s "$GITHUB_WORKSPACE/proj/s2m" Game
+          ln -s "$GITHUB_WORKSPACE/rsdk" RSDKv5
 
-      - name: Compilar APK
-        env:
-          ENGINE_DIR: ${{ github.workspace }}/engine
-        run: gradle :app:assembleRelease --no-daemon --stacktrace
+      - name: Build APK
+        run: |
+          cd rsdk/android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PABIFILTERS="arm64-v8a" --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SonicGalactic-APK
-          path: app/build/outputs/apk/release/*.apk
+          name: Sonic2M
